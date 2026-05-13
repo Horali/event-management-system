@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Kiro AI assistant internal files
+.kiro/
