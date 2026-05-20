@@ -1,4 +1,7 @@
+from .booking_id import BookingID
+from .booking_status import BookingStatus
 from .capacity import Capacity
+from .customer_id import CustomerID
 from .datetime_range import DateTimeRange, SalesPeriod
 from .event_id import EventID
 from .event_name import EventName
@@ -7,10 +10,14 @@ from .event_status import EventStatus
 from .location import Location
 from .money import Money
 from .organizer_id import OrganizerID
+from .quantity import Quantity
 from .ticket_category_id import TicketCategoryID
 
 __all__ = [
+    "BookingID",
+    "BookingStatus",
     "Capacity",
+    "CustomerID",
     "DateTimeRange",
     "SalesPeriod",
     "EventID",
@@ -20,5 +27,6 @@ __all__ = [
     "Location",
     "Money",
     "OrganizerID",
+    "Quantity",
     "TicketCategoryID",
 ]
