@@ -1,14 +1,3 @@
-"""Booking Aggregate Root.
-
-Manages the reservation lifecycle for ticket purchases.
-A Booking is created when a Customer reserves tickets for an Event.
-
-UC8  — Create Ticket Booking : __init__
-UC9  — Calculate Total Price  : total_price property
-UC10 — Pay Booking            : pay()
-UC11 — Expire Booking         : expire()
-"""
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -47,10 +36,6 @@ class Booking:
     - status transitions follow the defined lifecycle
     """
 
-    # ------------------------------------------------------------------ #
-    # Construction — UC8: Create Ticket Booking                           #
-    # ------------------------------------------------------------------ #
-
     def __init__(
         self,
         id: BookingID,
@@ -87,10 +72,6 @@ class Booking:
                 quantity=self._quantity.value,
             )
         )
-
-    # ------------------------------------------------------------------ #
-    # Properties                                                           #
-    # ------------------------------------------------------------------ #
 
     @property
     def id(self) -> BookingID:
@@ -138,18 +119,13 @@ class Booking:
         """Return a shallow copy of issued tickets."""
         return list(self._tickets)
 
-    # ------------------------------------------------------------------ #
-    # Domain Event Collection                                              #
-    # ------------------------------------------------------------------ #
+
 
     def collect_events(self) -> List[BaseDomainEvent]:
         events = list(self._pending_domain_events)
         self._pending_domain_events.clear()
         return events
 
-    # ------------------------------------------------------------------ #
-    # Commands                                                             #
-    # ------------------------------------------------------------------ #
 
     def pay(self, payment_amount: Money, paid_at: datetime | None = None) -> None:
         """UC10: Transition PendingPayment → Paid.
