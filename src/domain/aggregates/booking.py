@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 from src.domain.events.base import BaseDomainEvent
+from src.domain.events.booking_paid import BookingPaid
 from src.domain.events.ticket_reserved import TicketReserved
 from src.domain.value_objects.booking_id import BookingID
 from src.domain.value_objects.booking_status import BookingStatus
@@ -134,6 +135,42 @@ class Booking:
         events = list(self._pending_domain_events)
         self._pending_domain_events.clear()
         return events
+
+    # ------------------------------------------------------------------ #
+    # Commands                                                             #
+    # ------------------------------------------------------------------ #
+
+    def pay(self, payment_amount: Money, paid_at: datetime | None = None) -> None:
+        """UC10: Transition PendingPayment → Paid.
+
+        Guards (validate-first):
+        1. Status must be PendingPayment.
+        2. Payment must not be after the deadline.
+        3. Payment amount must equal the total price.
+        """
+        now = paid_at or datetime.now(tz=timezone.utc)
+
+        if self._status != BookingStatus.PENDING_PAYMENT:
+            raise ValueError(
+                f"Cannot pay booking with status {self._status.value}"
+            )
+        if now > self._payment_deadline:
+            raise ValueError(
+                "Cannot pay booking: payment deadline has passed"
+            )
+        if payment_amount != self.total_price:
+            raise ValueError(
+                f"Payment amount {payment_amount.amount} does not match "
+                f"total price {self.total_price.amount}"
+            )
+
+        self._status = BookingStatus.PAID
+        self._pending_domain_events.append(
+            BookingPaid(
+                occurred_at=now,
+                booking_id=self._id,
+            )
+        )
 
     def __repr__(self) -> str:
         return (
