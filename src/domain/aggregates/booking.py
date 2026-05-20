@@ -14,9 +14,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import List
 
+from src.domain.entities.ticket import Ticket
 from src.domain.events.base import BaseDomainEvent
 from src.domain.events.booking_expired import BookingExpired
 from src.domain.events.booking_paid import BookingPaid
+from src.domain.events.ticket_checked_in import TicketCheckedIn
 from src.domain.events.ticket_reserved import TicketReserved
 from src.domain.value_objects.booking_id import BookingID
 from src.domain.value_objects.booking_status import BookingStatus
@@ -25,6 +27,8 @@ from src.domain.value_objects.event_id import EventID
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.quantity import Quantity
 from src.domain.value_objects.ticket_category_id import TicketCategoryID
+from src.domain.value_objects.ticket_code import TicketCode
+from src.domain.value_objects.ticket_status import TicketStatus
 
 # Payment deadline: 15 minutes after booking creation
 PAYMENT_DEADLINE_MINUTES = 15
@@ -70,6 +74,7 @@ class Booking:
         self._payment_deadline: datetime = now + timedelta(
             minutes=PAYMENT_DEADLINE_MINUTES
         )
+        self._tickets: List[Ticket] = []
         self._pending_domain_events: List[BaseDomainEvent] = []
 
         self._pending_domain_events.append(
@@ -128,6 +133,11 @@ class Booking:
         """UC9: Total price = unit price × quantity."""
         return self._unit_price * self._quantity.value
 
+    @property
+    def tickets(self) -> List[Ticket]:
+        """Return a shallow copy of issued tickets."""
+        return list(self._tickets)
+
     # ------------------------------------------------------------------ #
     # Domain Event Collection                                              #
     # ------------------------------------------------------------------ #
@@ -166,6 +176,9 @@ class Booking:
             )
 
         self._status = BookingStatus.PAID
+        # Issue one Ticket per quantity unit with unique codes
+        for _ in range(self._quantity.value):
+            self._tickets.append(Ticket(code=TicketCode.generate()))
         self._pending_domain_events.append(
             BookingPaid(
                 occurred_at=now,
@@ -196,6 +209,45 @@ class Booking:
             BookingExpired(
                 occurred_at=now,
                 booking_id=self._id,
+            )
+        )
+
+    def check_in_ticket(
+        self,
+        ticket_code: TicketCode,
+        checked_in_at: datetime | None = None,
+    ) -> None:
+        """UC13: Check in a ticket by its code.
+
+        Guards (validate-first):
+        1. Ticket with given code must exist in this booking.
+        2. Ticket status must be Active — already checked-in tickets are rejected.
+        """
+        now = checked_in_at or datetime.now(tz=timezone.utc)
+
+        ticket = next(
+            (t for t in self._tickets if t.code == ticket_code),
+            None,
+        )
+        if ticket is None:
+            raise ValueError(
+                f"Ticket with code {ticket_code} not found in this booking"
+            )
+        if ticket.status == TicketStatus.CHECKED_IN:
+            raise ValueError(
+                f"Ticket {ticket_code} has already been checked in"
+            )
+        if ticket.status != TicketStatus.ACTIVE:
+            raise ValueError(
+                f"Cannot check in ticket with status {ticket.status.value}"
+            )
+
+        ticket.status = TicketStatus.CHECKED_IN
+        self._pending_domain_events.append(
+            TicketCheckedIn(
+                occurred_at=now,
+                booking_id=self._id,
+                ticket_code=ticket_code,
             )
         )
 

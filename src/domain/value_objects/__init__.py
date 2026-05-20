@@ -12,6 +12,8 @@ from .money import Money
 from .organizer_id import OrganizerID
 from .quantity import Quantity
 from .ticket_category_id import TicketCategoryID
+from .ticket_code import TicketCode
+from .ticket_status import TicketStatus
 
 __all__ = [
     "BookingID",
@@ -29,4 +31,6 @@ __all__ = [
     "OrganizerID",
     "Quantity",
     "TicketCategoryID",
+    "TicketCode",
+    "TicketStatus",
 ]
