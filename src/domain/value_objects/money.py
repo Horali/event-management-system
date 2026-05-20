@@ -1,9 +1,3 @@
-"""Money Value Object.
-
-Represents a non-negative monetary amount with a currency.
-Two Money instances with the same amount and currency are equal (structural equality).
-Immutable: frozen dataclass prevents accidental mutation.
-"""
 
 from __future__ import annotations
 

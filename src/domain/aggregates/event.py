@@ -4,18 +4,17 @@ The central aggregate for the Event Management bounded context.
 All state changes go through this class's methods — nothing outside
 the aggregate boundary may directly mutate TicketCategory instances.
 
-UC1  — Create Event   : __init__
-UC2  — Publish Event  : publish()
-UC3  — Cancel Event   : cancel()
-UC4  — Add Category   : add_ticket_category()
-UC5  — Disable Category: disable_ticket_category()
+UC1  — Create Event        : __init__
+UC2  — Publish Event       : publish()
+UC3  — Cancel Event        : cancel()
+UC4  — Add Category        : add_ticket_category()
+UC5  — Disable Category    : disable_ticket_category()
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import List, Optional
-from uuid import UUID, uuid4
 
 from src.domain.entities.ticket_category import TicketCategory
 from src.domain.events.base import BaseDomainEvent
@@ -24,18 +23,26 @@ from src.domain.events.event_created import EventCreated
 from src.domain.events.event_published import EventPublished
 from src.domain.events.ticket_category_created import TicketCategoryCreated
 from src.domain.events.ticket_category_disabled import TicketCategoryDisabled
+from src.domain.value_objects.capacity import Capacity
 from src.domain.value_objects.datetime_range import DateTimeRange
+from src.domain.value_objects.event_id import EventID
+from src.domain.value_objects.event_name import EventName
+from src.domain.value_objects.event_schedule import EventSchedule
 from src.domain.value_objects.event_status import EventStatus
+from src.domain.value_objects.location import Location
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.organizer_id import OrganizerID
+from src.domain.value_objects.ticket_category_id import TicketCategoryID
 
 
 class Event:
     """Aggregate Root for the Event domain.
 
     Invariants enforced by this class:
-    - name is non-empty and non-whitespace
-    - capacity > 0
-    - schedule.end >= schedule.start  (enforced by DateTimeRange)
+    - name is non-empty and non-whitespace       (enforced by EventName)
+    - capacity > 0                               (enforced by Capacity)
+    - schedule.end >= schedule.start             (enforced by EventSchedule → DateTimeRange)
+    - location is non-empty                      (enforced by Location)
     - total ticket quota <= capacity at all times
     - status transitions follow the defined lifecycle
     """
@@ -46,34 +53,25 @@ class Event:
 
     def __init__(
         self,
-        id: UUID,
-        organizer_id: UUID,
-        name: str,
+        id: EventID,
+        organizer_id: OrganizerID,
+        name: EventName,
         description: str,
-        schedule: DateTimeRange,
-        location: str,
-        capacity: int,
+        schedule: EventSchedule,
+        location: Location,
+        capacity: Capacity,
     ) -> None:
-        # --- Guard clauses (validate-first) ---
-        if not name or not name.strip():
-            raise ValueError("Event name cannot be empty or whitespace")
-        if capacity <= 0:
-            raise ValueError(
-                f"Event capacity must be greater than zero, got: {capacity}"
-            )
-
-        self._id: UUID = id
-        self._organizer_id: UUID = organizer_id
-        self._name: str = name.strip()
+        self._id: EventID = id
+        self._organizer_id: OrganizerID = organizer_id
+        self._name: EventName = name
         self._description: str = description
-        self._schedule: DateTimeRange = schedule
-        self._location: str = location
-        self._capacity: int = capacity
+        self._schedule: EventSchedule = schedule
+        self._location: Location = location
+        self._capacity: Capacity = capacity
         self._status: EventStatus = EventStatus.DRAFT
         self._ticket_categories: List[TicketCategory] = []
         self._pending_domain_events: List[BaseDomainEvent] = []
 
-        # Record domain event
         self._pending_domain_events.append(
             EventCreated(
                 occurred_at=datetime.now(tz=timezone.utc),
@@ -84,19 +82,19 @@ class Event:
         )
 
     # ------------------------------------------------------------------ #
-    # Properties (read-only access to aggregate state)                     #
+    # Properties                                                           #
     # ------------------------------------------------------------------ #
 
     @property
-    def id(self) -> UUID:
+    def id(self) -> EventID:
         return self._id
 
     @property
-    def organizer_id(self) -> UUID:
+    def organizer_id(self) -> OrganizerID:
         return self._organizer_id
 
     @property
-    def name(self) -> str:
+    def name(self) -> EventName:
         return self._name
 
     @property
@@ -104,15 +102,15 @@ class Event:
         return self._description
 
     @property
-    def schedule(self) -> DateTimeRange:
+    def schedule(self) -> EventSchedule:
         return self._schedule
 
     @property
-    def location(self) -> str:
+    def location(self) -> Location:
         return self._location
 
     @property
-    def capacity(self) -> int:
+    def capacity(self) -> Capacity:
         return self._capacity
 
     @property
@@ -121,7 +119,6 @@ class Event:
 
     @property
     def ticket_categories(self) -> List[TicketCategory]:
-        """Return a shallow copy so callers cannot mutate the internal list."""
         return list(self._ticket_categories)
 
     @property
@@ -130,7 +127,6 @@ class Event:
 
     @property
     def total_quota(self) -> int:
-        """Sum of quotas across ALL ticket categories (active and inactive)."""
         return sum(tc.quota for tc in self._ticket_categories)
 
     # ------------------------------------------------------------------ #
@@ -138,11 +134,6 @@ class Event:
     # ------------------------------------------------------------------ #
 
     def collect_events(self) -> List[BaseDomainEvent]:
-        """Return pending domain events and clear the internal list.
-
-        The application layer calls this after repository.save(event) to
-        dispatch events. Clearing prevents double-dispatch on retry.
-        """
         events = list(self._pending_domain_events)
         self._pending_domain_events.clear()
         return events
@@ -152,13 +143,7 @@ class Event:
     # ------------------------------------------------------------------ #
 
     def publish(self) -> None:
-        """UC2: Transition Draft → Published.
-
-        Guards (validate-first):
-        1. Status must not be Cancelled, Published, or Completed.
-        2. Must have at least one active TicketCategory.
-        3. Total quota of active categories must not exceed capacity.
-        """
+        """UC2: Transition Draft → Published."""
         if self._status == EventStatus.CANCELLED:
             raise ValueError(
                 f"Cannot publish event with status {self._status.value}"
@@ -174,10 +159,10 @@ class Event:
                 "Cannot publish event: no active ticket categories"
             )
         active_quota = sum(tc.quota for tc in self.active_ticket_categories)
-        if active_quota > self._capacity:
+        if active_quota > self._capacity.value:
             raise ValueError(
                 f"Cannot publish event: total quota ({active_quota}) "
-                f"exceeds capacity ({self._capacity})"
+                f"exceeds capacity ({self._capacity.value})"
             )
 
         self._status = EventStatus.PUBLISHED
@@ -189,12 +174,7 @@ class Event:
         )
 
     def cancel(self) -> None:
-        """UC3: Transition Published → Cancelled.
-
-        Also deactivates all TicketCategories atomically.
-        Guards (validate-first):
-        1. Status must be Published (Draft, Completed, and already-Cancelled are rejected).
-        """
+        """UC3: Transition Published → Cancelled. Deactivates all categories."""
         if self._status == EventStatus.COMPLETED:
             raise ValueError(
                 f"Cannot cancel event with status {self._status.value}"
@@ -207,8 +187,6 @@ class Event:
             raise ValueError("Event is already cancelled")
 
         self._status = EventStatus.CANCELLED
-
-        # Deactivate all ticket categories atomically
         for tc in self._ticket_categories:
             tc.is_active = False
 
@@ -226,17 +204,7 @@ class Event:
         quota: int,
         sales_period: DateTimeRange,
     ) -> TicketCategory:
-        """UC4: Add a new TicketCategory to this Event.
-
-        Guards (validate-first):
-        1. Name must be non-empty and non-whitespace.
-        2. Price amount must be >= 0 (enforced by Money, but checked here for clarity).
-        3. Quota must be > 0.
-        4. Sales period end must be <= event schedule start.
-        5. Adding quota must not push total over capacity.
-
-        Returns the created TicketCategory.
-        """
+        """UC4: Add a new TicketCategory to this Event."""
         if not name or not name.strip():
             raise ValueError(
                 "Ticket category name cannot be empty or whitespace"
@@ -249,14 +217,15 @@ class Event:
             raise ValueError(
                 "Sales period must end on or before the event start date"
             )
-        if self.total_quota + quota > self._capacity:
+        if self.total_quota + quota > self._capacity.value:
             raise ValueError(
                 f"Adding quota ({quota}) would exceed event capacity "
-                f"({self._capacity}). Current total: {self.total_quota}"
+                f"({self._capacity.value}). Current total: {self.total_quota}"
             )
 
+        category_id = TicketCategoryID.generate()
         category = TicketCategory(
-            id=uuid4(),
+            id=category_id,
             name=name.strip(),
             price=price,
             quota=quota,
@@ -269,20 +238,14 @@ class Event:
             TicketCategoryCreated(
                 occurred_at=datetime.now(tz=timezone.utc),
                 event_id=self._id,
-                ticket_category_id=category.id,
+                ticket_category_id=category_id,
                 name=category.name,
             )
         )
         return category
 
-    def disable_ticket_category(self, category_id: UUID) -> None:
-        """UC5: Disable a specific TicketCategory by ID.
-
-        Guards (validate-first):
-        1. Event must not be Completed.
-        2. Category with given ID must exist.
-        3. Category must currently be active.
-        """
+    def disable_ticket_category(self, category_id: TicketCategoryID) -> None:
+        """UC5: Disable a specific TicketCategory by ID."""
         if self._status == EventStatus.COMPLETED:
             raise ValueError(
                 f"Cannot disable ticket category on a {self._status.value} event"
@@ -302,7 +265,6 @@ class Event:
             )
 
         category.is_active = False
-
         self._pending_domain_events.append(
             TicketCategoryDisabled(
                 occurred_at=datetime.now(tz=timezone.utc),

@@ -11,10 +11,10 @@ when the category is explicitly disabled.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from uuid import UUID
 
 from src.domain.value_objects.datetime_range import DateTimeRange
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.ticket_category_id import TicketCategoryID
 
 # Semantic alias: a SalesPeriod is a DateTimeRange used for ticket sales.
 SalesPeriod = DateTimeRange
@@ -22,7 +22,7 @@ SalesPeriod = DateTimeRange
 
 @dataclass
 class TicketCategory:
-    id: UUID
+    id: TicketCategoryID
     name: str
     price: Money
     quota: int

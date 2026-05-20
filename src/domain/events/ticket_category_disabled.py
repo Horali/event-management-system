@@ -1,18 +1,13 @@
-"""TicketCategoryDisabled Domain Event.
-
-Raised when a TicketCategory is disabled on an Event.
-Carries both IDs so the application layer can identify affected bookings.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID
 
-from .base import BaseDomainEvent
+from src.domain.events.base import BaseDomainEvent
+from src.domain.value_objects.event_id import EventID
+from src.domain.value_objects.ticket_category_id import TicketCategoryID
 
 
 @dataclass(frozen=True)
 class TicketCategoryDisabled(BaseDomainEvent):
-    event_id: UUID = None           # type: ignore[assignment]
-    ticket_category_id: UUID = None  # type: ignore[assignment]
+    event_id: EventID = None                    # type: ignore[assignment]
+    ticket_category_id: TicketCategoryID = None  # type: ignore[assignment]

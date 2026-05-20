@@ -1,9 +1,3 @@
-"""DateTimeRange Value Object.
-
-Represents a closed interval [start, end] where start <= end.
-Used for both the event schedule and ticket sales periods (SalesPeriod).
-Immutable: frozen dataclass.
-"""
 
 from __future__ import annotations
 

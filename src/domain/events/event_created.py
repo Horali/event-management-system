@@ -1,19 +1,15 @@
-"""EventCreated Domain Event.
-
-Raised when a new Event is successfully created.
-Carries the minimum data needed by downstream handlers.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID
 
-from .base import BaseDomainEvent
+from src.domain.events.base import BaseDomainEvent
+from src.domain.value_objects.event_id import EventID
+from src.domain.value_objects.event_name import EventName
+from src.domain.value_objects.organizer_id import OrganizerID
 
 
 @dataclass(frozen=True)
 class EventCreated(BaseDomainEvent):
-    event_id: UUID = None       # type: ignore[assignment]
-    organizer_id: UUID = None   # type: ignore[assignment]
-    name: str = ""
+    event_id: EventID = None        # type: ignore[assignment]
+    organizer_id: OrganizerID = None  # type: ignore[assignment]
+    name: EventName = None          # type: ignore[assignment]

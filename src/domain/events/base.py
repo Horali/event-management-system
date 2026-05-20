@@ -1,8 +1,4 @@
-"""Base Domain Event.
 
-All domain events inherit from BaseDomainEvent.
-Events are immutable facts — frozen dataclasses.
-"""
 
 from __future__ import annotations
 
