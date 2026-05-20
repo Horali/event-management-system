@@ -1,4 +1,5 @@
 from .base import BaseDomainEvent
+from .booking_expired import BookingExpired
 from .booking_paid import BookingPaid
 from .event_created import EventCreated
 from .event_published import EventPublished
@@ -9,6 +10,7 @@ from .ticket_reserved import TicketReserved
 
 __all__ = [
     "BaseDomainEvent",
+    "BookingExpired",
     "BookingPaid",
     "EventCreated",
     "EventPublished",

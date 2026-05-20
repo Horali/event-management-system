@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 from src.domain.events.base import BaseDomainEvent
+from src.domain.events.booking_expired import BookingExpired
 from src.domain.events.booking_paid import BookingPaid
 from src.domain.events.ticket_reserved import TicketReserved
 from src.domain.value_objects.booking_id import BookingID
@@ -167,6 +168,32 @@ class Booking:
         self._status = BookingStatus.PAID
         self._pending_domain_events.append(
             BookingPaid(
+                occurred_at=now,
+                booking_id=self._id,
+            )
+        )
+
+    def expire(self, expired_at: datetime | None = None) -> None:
+        """UC11: Transition PendingPayment → Expired.
+
+        Called by the system when the payment deadline has passed
+        and the booking has not been paid.
+
+        Guards (validate-first):
+        1. Status must be PendingPayment — a Paid booking cannot expire.
+        """
+        now = expired_at or datetime.now(tz=timezone.utc)
+
+        if self._status == BookingStatus.PAID:
+            raise ValueError("Cannot expire a booking that has already been paid")
+        if self._status != BookingStatus.PENDING_PAYMENT:
+            raise ValueError(
+                f"Cannot expire booking with status {self._status.value}"
+            )
+
+        self._status = BookingStatus.EXPIRED
+        self._pending_domain_events.append(
+            BookingExpired(
                 occurred_at=now,
                 booking_id=self._id,
             )
