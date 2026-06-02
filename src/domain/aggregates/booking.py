@@ -232,3 +232,18 @@ class Booking:
             f"Booking(id={self._id!r}, status={self._status.value!r}, "
             f"quantity={self._quantity.value})"
         )
+    
+    def refund(self) -> None:
+        """Transition Paid -> Refunded and cancel tickets."""
+        if self._status != BookingStatus.PAID:
+            raise ValueError(
+                f"Cannot refund booking with status {self._status.value}"
+            )
+        self._status = BookingStatus.REFUNDED
+        for ticket in self._tickets:
+            ticket.status = TicketStatus.CANCELLED
+
+    def cancel_tickets(self) -> None:
+        """Cancel all tickets in this booking."""
+        for ticket in self._tickets:
+            ticket.status = TicketStatus.CANCELLED
