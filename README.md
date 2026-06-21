@@ -33,15 +33,18 @@ Server runs at `http://127.0.0.1:8000`. Swagger UI available at `http://127.0.0.
 
 ## How to Configure PostgreSQL
 
-1. Ensure PostgreSQL is running locally.
-2. Create a database:
-   ```sql
-   CREATE DATABASE event_management_db;
-   ```
-3. Update the `DATABASE_URL` in your `.env` file:
-   ```env
-   DATABASE_URL=postgresql+psycopg://<username>:<password>@localhost:5433/event_management_db
-   ```
+This project uses Docker to run PostgreSQL. Make sure Docker Desktop is running, then:
+
+```bash
+docker compose up -d
+```
+
+This starts a PostgreSQL 16 container on port **5433**. The default `.env` is already configured to connect to it — no changes needed.
+
+To stop the container when you're done:
+```bash
+docker compose down
+```
 
 ---
 

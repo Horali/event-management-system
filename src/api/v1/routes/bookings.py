@@ -40,6 +40,36 @@ def create_booking(
     booking_id = handler.handle(command)
     return {"id": booking_id}
 
+# Static route MUST be declared before /{booking_id} to avoid FastAPI
+# treating "tickets" as a UUID path parameter (UC12 — View Purchased Tickets)
+@router.get("/tickets", response_model=List[TicketDTO])
+def get_customer_tickets(
+    customer_id: UUID = Query(...),
+    booking_repo: BookingRepository = Depends(get_booking_repository)
+):
+    all_bookings = booking_repo.find_all()
+    customer_paid_bookings = [
+        b for b in all_bookings
+        if b.customer_id == CustomerID(customer_id) and b.status == BookingStatus.PAID
+    ]
+
+    tickets_dto = []
+    for booking in customer_paid_bookings:
+        for ticket in booking.tickets:
+            tickets_dto.append(TicketDTO.from_domain(ticket))
+
+    return tickets_dto
+
+@router.get("/{booking_id}", response_model=BookingDTO)
+def get_booking(
+    booking_id: UUID,
+    booking_repo: BookingRepository = Depends(get_booking_repository)
+):
+    booking = booking_repo.find_by_id(BookingID(booking_id))
+    if not booking:
+        raise HTTPException(status_code=404, detail=f"Booking with ID {booking_id} was not found.")
+    return BookingDTO.from_domain(booking)
+
 @router.post("/{booking_id}/pay")
 def pay_booking(
     booking_id: UUID,
@@ -62,31 +92,3 @@ def expire_booking(
     command = ExpireBookingCommand(booking_id=booking_id)
     handler.handle(command)
     return {"message": "Booking expired successfully"}
-
-@router.get("/{booking_id}", response_model=BookingDTO)
-def get_booking(
-    booking_id: UUID,
-    booking_repo: BookingRepository = Depends(get_booking_repository)
-):
-    booking = booking_repo.find_by_id(BookingID(booking_id))
-    if not booking:
-        raise HTTPException(status_code=404, detail=f"Booking with ID {booking_id} was not found.")
-    return BookingDTO.from_domain(booking)
-
-@router.get("/tickets", response_model=List[TicketDTO])
-def get_customer_tickets(
-    customer_id: UUID = Query(...),
-    booking_repo: BookingRepository = Depends(get_booking_repository)
-):
-    all_bookings = booking_repo.find_all()
-    customer_paid_bookings = [
-        b for b in all_bookings 
-        if b.customer_id == CustomerID(customer_id) and b.status == BookingStatus.PAID
-    ]
-    
-    tickets_dto = []
-    for booking in customer_paid_bookings:
-        for ticket in booking.tickets:
-            tickets_dto.append(TicketDTO.from_domain(ticket))
-    
-    return tickets_dto
