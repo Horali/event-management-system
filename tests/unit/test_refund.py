@@ -10,16 +10,44 @@ Validate-first: negative/error cases before positive cases.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
 import pytest
 
+from src.domain.aggregates.booking import Booking, PAYMENT_DEADLINE_MINUTES
 from src.domain.aggregates.refund import Refund
 from src.domain.events.refund_approved import RefundApproved
 from src.domain.events.refund_paid_out import RefundPaidOut
 from src.domain.events.refund_rejected import RefundRejected
 from src.domain.events.refund_requested import RefundRequested
 from src.domain.value_objects.booking_id import BookingID
+from src.domain.value_objects.customer_id import CustomerID
+from src.domain.value_objects.event_id import EventID
+from src.domain.value_objects.money import Money
+from src.domain.value_objects.quantity import Quantity
 from src.domain.value_objects.refund_id import RefundID
 from src.domain.value_objects.refund_status import RefundStatus
+from src.domain.value_objects.ticket_category_id import TicketCategoryID
+from src.domain.value_objects.ticket_status import TicketStatus
+
+
+def make_paid_booking(quantity: int = 1) -> Booking:
+    """Return a Paid booking with tickets issued."""
+    created = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+    booking = Booking(
+        id=BookingID.generate(),
+        customer_id=CustomerID.generate(),
+        event_id=EventID.generate(),
+        ticket_category_id=TicketCategoryID.generate(),
+        unit_price=Money(amount=Decimal("150000"), currency="IDR"),
+        quantity=Quantity(quantity),
+        created_at=created,
+    )
+    booking.collect_events()
+    booking.pay(booking.total_price, paid_at=created + timedelta(minutes=5))
+    booking.collect_events()
+    return booking
 
 
 def make_refund() -> Refund:
@@ -32,6 +60,14 @@ def make_approved_refund() -> Refund:
     refund.approve()
     refund.collect_events()
     return refund
+
+
+# ------------------------------------------------------------------ #
+# UC15 helpers for checked-in ticket guard                            #
+# ------------------------------------------------------------------ #
+
+def make_refund_for_booking(booking: Booking) -> Refund:
+    return Refund(id=RefundID.generate(), booking_id=booking.id)
 
 
 # ------------------------------------------------------------------ #
@@ -55,6 +91,30 @@ class TestRequestRefund:
         ev = events[0]
         assert ev.refund_id == refund.id
         assert ev.booking_id == refund.booking_id
+
+    def test_refund_cannot_be_requested_if_ticket_already_checked_in(self) -> None:
+        """
+        Acceptance Criteria: A refund cannot be requested if any ticket from
+        the booking has already been checked in.
+
+        The Booking aggregate enforces this via can_request_refund().
+        """
+        booking = make_paid_booking(quantity=2)
+        ticket = booking.tickets[0]
+
+        # Check in one ticket
+        booking.check_in_ticket(ticket.code)
+        booking.collect_events()
+
+        # Domain guard must reject the refund request
+        with pytest.raises(ValueError, match="checked in"):
+            booking.can_request_refund()
+
+    def test_refund_can_be_requested_when_no_tickets_checked_in(self) -> None:
+        """Booking with all-Active tickets should pass the refund guard."""
+        booking = make_paid_booking(quantity=2)
+        # No check-ins — should not raise
+        booking.can_request_refund()  # passes silently
 
 
 # ------------------------------------------------------------------ #

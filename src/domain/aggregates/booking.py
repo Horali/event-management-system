@@ -247,3 +247,19 @@ class Booking:
         """Cancel all tickets in this booking."""
         for ticket in self._tickets:
             ticket.status = TicketStatus.CANCELLED
+
+    def can_request_refund(self) -> None:
+        """UC15: Guard — raise if a refund cannot be requested for this booking.
+
+        Enforces:
+        - Booking must be Paid.
+        - No ticket may have status CheckedIn.
+        """
+        if self._status != BookingStatus.PAID:
+            raise ValueError(
+                f"Cannot request refund for booking with status {self._status.value}"
+            )
+        if any(t.status == TicketStatus.CHECKED_IN for t in self._tickets):
+            raise ValueError(
+                "Cannot request refund: one or more tickets have already been checked in"
+            )

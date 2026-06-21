@@ -15,7 +15,6 @@ from src.domain.value_objects.booking_id import BookingID
 from src.domain.value_objects.booking_status import BookingStatus
 from src.domain.value_objects.event_status import EventStatus
 from src.domain.value_objects.refund_id import RefundID
-from src.domain.value_objects.ticket_status import TicketStatus
 
 
 @dataclass(frozen=True)
@@ -43,16 +42,11 @@ class RequestRefundHandler:
             raise BookingNotFoundException(str(command.booking_id))
 
         # 1. A refund can only be requested for a booking with the status Paid
-        if booking.status != BookingStatus.PAID:
-            raise BusinessRuleException(
-                f"Cannot request refund for booking in status {booking.status.value}"
-            )
-
         # 2. A refund cannot be requested if any ticket from the booking has already been checked in
-        if any(t.status == TicketStatus.CHECKED_IN for t in booking.tickets):
-            raise BusinessRuleException(
-                "Cannot request refund: one or more tickets have already been checked in"
-            )
+        try:
+            booking.can_request_refund()
+        except ValueError as e:
+            raise BusinessRuleException(str(e))
 
         # 3. A refund can only be requested before the refund deadline (48 hours before event start).
         # Automatically allowed if the event is cancelled.
