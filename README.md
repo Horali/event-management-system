@@ -33,17 +33,25 @@ Server runs at `http://127.0.0.1:8000`. Swagger UI available at `http://127.0.0.
 
 ## How to Configure PostgreSQL
 
-This project uses Docker to run PostgreSQL. Make sure Docker Desktop is running, then:
+You can run PostgreSQL either via Docker or a local installation.
 
+**Option A — Docker (recommended)**
+
+Make sure Docker Desktop is running, then:
 ```bash
 docker compose up -d
 ```
+This starts a PostgreSQL 16 container on port **5433**. The default `.env` is already configured for this — no changes needed.
 
-This starts a PostgreSQL 16 container on port **5433**. The default `.env` is already configured to connect to it — no changes needed.
+**Option B — Local PostgreSQL**
 
-To stop the container when you're done:
-```bash
-docker compose down
+Create the database manually:
+```sql
+CREATE DATABASE event_management_db;
+```
+Then update `DATABASE_URL` in your `.env` to match your local credentials and port (typically `5432`):
+```env
+DATABASE_URL=postgresql+psycopg://<username>:<password>@localhost:5432/event_management_db
 ```
 
 ---
